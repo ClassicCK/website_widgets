@@ -1,64 +1,58 @@
-# Load required libraries
-library(ggplot2)
-library(plotly)
-library(tidyverse)
-library(showtext)
-library(htmlwidgets)
+library(rcrossref)
+library(dplyr)
+library(r2d3)
+library(jsonlite)
 
-# Add fonts
-font_add_google("Rubik", "title_font")
-font_add_google("Roboto Mono", "body_font")
-showtext_auto()
+# Function to fetch publications by DOIs
+fetch_publications_by_doi <- function(doi_list) {
+  publications <- data.frame()
 
-# Create a data frame with your publications
-# Replace this sample data with your actual publication data
-publications <- data.frame(
-  Title = c(
-    "Machine Learning in Healthcare",
-    "Data-Driven Decision Making",
-    "Statistical Analysis of Climate Data",
-    "Predictive Modeling for Stock Prices",
-    "Natural Language Processing Techniques"
-  ),
-  Citations = c(45, 32, 28, 20, 15),
-  Year = c(2021, 2020, 2022, 2019, 2023)
-)
+  for (doi in doi_list) {
+    tryCatch({
+      work <- cr_works(doi = doi)$data
 
-# Group by year and sort
-publications <- publications %>%
-  group_by(Year) %>%
-  arrange(desc(Citations)) %>%
-  mutate(Order = row_number()) %>%
-  ungroup() %>%
-  arrange(desc(Year), desc(Citations))
+      if (!is.null(work)) {
+        pub <- work %>%
+          select(title, issued, is.referenced.by.count, doi, url) %>%
+          mutate(
+            Year = as.numeric(substr(issued, 1, 4)),
+            Citations = is.referenced.by.count,
+            Title = title,
+            DOI = doi
+          ) %>%
+          select(Title, Year, Citations, DOI, url)
 
-# Create the plot
-p <- ggplot(publications, aes(x = Citations, y = reorder(paste(Year, Title), Order))) +
-  geom_bar(stat = "identity", fill = "#0015BC", alpha = 0.7) +
-  labs(title = "Impact of Research Publications",
-       subtitle = "Visualizing citation counts across years",
-       x = "Number of Citations",
-       y = NULL) +
-  theme_minimal() +
-  theme(
-    text = element_text(family = "body_font"),
-    plot.title = element_text(family = "title_font", size = 24, face = "bold"),
-    plot.subtitle = element_text(size = 18, color = "grey30"),
-    axis.title.x = element_text(size = 12, color = "grey30", margin = margin(t = 10)),
-    axis.text.x = element_text(face = "bold", size = 14),
-    axis.text.y = element_text(face = "bold", size = 14),
-    plot.background = element_rect(fill = "#f8f8f8", color = NA),
-    panel.grid.major.x = element_line(color = "grey90"),
-    panel.grid.major.y = element_blank(),
-    plot.margin = margin(20, 20, 20, 20)
-  )
+        publications <- bind_rows(publications, pub)
+      }
+    }, error = function(e) {
+      warning(paste("Error fetching DOI:", doi, "-", e$message))
+    })
+  }
 
-# Convert to plotly for interactivity
-p_interactive <- ggplotly(p, tooltip = "text") %>%
-  layout(hoverlabel = list(bgcolor = "white", font = list(family = "Roboto Mono"))) %>%
-  style(text = paste("Title:", publications$Title, "<br>",
-                     "Citations:", publications$Citations, "<br>",
-                     "Year:", publications$Year))
+  publications %>%
+    arrange(desc(Year), desc(Citations))
+}
 
-# Save the plot as an interactive HTML widget
-htmlwidgets::saveWidget(p_interactive, "publications_plot.html", selfcontained = TRUE)
+# List of your publication DOIs
+my_dois <- c("10.1038/s41467-020-20836-3",
+             "10.1073/pnas.2106130118",
+             "10.1073/pnas.2116691118",
+             "10.1038/s41467-022-30037-9",
+             "10.1111/gcb.17203",
+             "10.1111/2041-210X.14368")
+
+# Fetch publications
+publications <- fetch_publications_by_doi(my_dois)
+write_json(publications, file = "publications.json")
+
+# Create the visualization
+viz <- r2d3(data = publications, script = "publication_viz.js", d3_version = 5,
+            css = "
+     body { font-family: 'Arial', monospace; background-color: #fff9fb; }
+     .tooltip { font-size: 12px; }
+     ")
+
+# Save as HTML file
+r2d3::save_d3_html(viz, file = "publications_viz.html")
+
+print("Visualization created and saved as publications_viz.html")
