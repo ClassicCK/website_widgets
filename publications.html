@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impact of Research Publications</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background-color: #fff9fb;
+        }
+        .bar {
+            fill: #4b88a2;
+        }
+        .bar:hover {
+            fill: #366f87;
+        }
+        .axis text {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .axis-label {
+            font-size: 12px;
+            fill: #6d6f71;
+        }
+        .subtitle {
+            font-size: 18px;
+            fill: #6d6f71;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: #fff9fb;
+            border: 1px solid #6d6f71;
+            padding: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <svg id="chart"></svg>
+
+    <script>
+        const publications = [
+            {Title: "Continent-wide tree fecundity driven by indirect climate effects", Citations: 75, Year: 2021},
+            {Title: "Is there tree senescence? The fecundity evidence", Citations: 54, Year: 2021},
+            {Title: "North American tree migration paced by climate in the West, lagging in the East", Citations: 41, Year: 2022},
+            {Title: "Limits to reproduction and seed size-number trade-offs that shape forest dominance and future recovery", Citations: 27, Year: 2022},
+            {Title: "Temperature and CO2 interactively drive shifts in the compositional and functional structure of peatland protist communities", Citations: 2, Year: 2024}
+        ];
+
+        const margin = {top: 60, right: 30, bottom: 50, left: 60};
+        const width = 800 - margin.left - margin.right;
+        const height = 400 - margin.top - margin.bottom;
+
+        const svg = d3.select("#chart")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleLinear()
+            .domain([0, d3.max(publications, d => d.Citations)])
+            .range([0, width]);
+
+        const y = d3.scaleBand()
+            .domain(publications.map(d => d.Year))
+            .range([height, 0])
+            .padding(0.1);
+
+        svg.append("g")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(x))
+            .selectAll("text")
+            .style("font-weight", "bold");
+
+        svg.append("g")
+            .call(d3.axisLeft(y))
+            .selectAll("text")
+            .style("font-weight", "bold");
+
+        svg.selectAll(".bar")
+            .data(publications)
+            .enter().append("rect")
+            .attr("class", "bar")
+            .attr("x", 0)
+            .attr("y", d => y(d.Year))
+            .attr("width", d => x(d.Citations))
+            .attr("height", y.bandwidth());
+
+        svg.append("text")
+            .attr("class", "axis-label")
+            .attr("x", width / 2)
+            .attr("y", height + margin.bottom - 10)
+            .style("text-anchor", "middle")
+            .text("Number of Citations");
+
+        svg.append("text")
+            .attr("class", "subtitle")
+            .attr("x", width / 2)
+            .attr("y", -margin.top / 2)
+            .style("text-anchor", "middle")
+            .text("Visualizing citation counts across years");
+
+        // Tooltip
+        const tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+
+        svg.selectAll(".bar")
+            .on("mouseover", function(event, d) {
+                tooltip.transition()
+                    .duration(200)
+                    .style("opacity", .9);
+                tooltip.html(`Title: ${d.Title}<br>Citations: ${d.Citations}<br>Year: ${d.Year}`)
+                    .style("left", (event.pageX) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+            })
+            .on("mouseout", function(d) {
+                tooltip.transition()
+                    .duration(500)
+                    .style("opacity", 0);
+            });
+    </script>
+</body>
+</html>
